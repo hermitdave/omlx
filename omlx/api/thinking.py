@@ -301,6 +301,17 @@ class ThinkingParser:
                     i += len(_HY3_OPEN_TAG)
                     continue
 
+                # Try to match IFM/K2-Horizon tags
+                ifm_matched = False
+                for ifm_open in _IFM_OPEN_TAGS:
+                    if remaining.startswith(ifm_open):
+                        self._in_thinking = True
+                        i += len(ifm_open)
+                        ifm_matched = True
+                        break
+                if ifm_matched:
+                    continue
+
                 # Try to match </think>
                 if remaining.startswith(_CLOSE_TAG):
                     self._in_thinking = False
@@ -312,6 +323,18 @@ class ThinkingParser:
                     self._in_thinking = False
                     self._close_seen = True
                     i += len(_HY3_CLOSE_TAG)
+                    continue
+
+                # Try to match IFM/K2-Horizon close tags
+                ifm_matched = False
+                for ifm_close in _IFM_CLOSE_TAGS:
+                    if remaining.startswith(ifm_close):
+                        self._in_thinking = False
+                        self._close_seen = True
+                        i += len(ifm_close)
+                        ifm_matched = True
+                        break
+                if ifm_matched:
                     continue
 
                 # Check if it could be a partial tag (not enough chars yet)
