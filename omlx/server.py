@@ -499,11 +499,6 @@ async def lifespan(app: FastAPI):
         _server_state.engine_pool._get_admission_soft_target = (
             enforcer.get_admission_soft_target
         )
-        # Resident-vs-mmap is a throughput call and must not read the
-        # instantaneous ceiling, which dips right after a model swap.
-        _server_state.engine_pool._get_residency_ceiling = (
-            enforcer.get_residency_ceiling
-        )
         enforcer.start()
 
     # Startup: Preload pinned models in the background so uvicorn binds the
@@ -4831,9 +4826,15 @@ async def stream_chat_completion(
 
                 # Emit content delta — filter out tool-call markup when
                 # tools are present so clients see clean streamed text.
+                # Also always strip IFM/K2-Horizon tool call tags which
+                # may appear even when no tools are provided.
                 if content_delta:
                     if tool_filter:
                         content_delta = tool_filter.feed(content_delta)
+                    else:
+                        from .api.utils import _IFM_TAGS_TO_STRIP_THINK
+                        for tag in _IFM_TAGS_TO_STRIP_THINK:
+                            content_delta = content_delta.replace(tag, "")
                     if content_delta:
                         chunk = ChatCompletionChunk(
                             id=response_id,
@@ -4893,6 +4894,10 @@ async def stream_chat_completion(
         if content_delta:
             if tool_filter:
                 content_delta = tool_filter.feed(content_delta)
+            else:
+                from .api.utils import _IFM_TAGS_TO_STRIP_THINK
+                for tag in _IFM_TAGS_TO_STRIP_THINK:
+                    content_delta = content_delta.replace(tag, "")
             if content_delta:
                 chunk = ChatCompletionChunk(
                     id=response_id,
