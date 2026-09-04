@@ -124,11 +124,18 @@ _IFM_TAGS_TO_STRIP = (
     "</ifm|arg_type>",
 )
 
+# Subset that excludes think tags (for clean_special_tokens — extract_thinking handles think tags)
+_IFM_TAGS_TO_STRIP_THINK = tuple(
+    tag for tag in _IFM_TAGS_TO_STRIP
+    if "think" not in tag
+)
+
 
 def clean_special_tokens(text: str) -> str:
     """Clean model output by removing only special tokens.
 
     Preserves <think>...</think> blocks for downstream processing.
+    Preserves IFM/K2-Horizon think tags for extract_thinking() to handle.
 
     Args:
         text: Raw model output
@@ -139,8 +146,8 @@ def clean_special_tokens(text: str) -> str:
     if not text:
         return text
     text = SPECIAL_TOKENS_PATTERN.sub("", text)
-    # Strip IFM/K2-Horizon tags
-    for tag in _IFM_TAGS_TO_STRIP:
+    # Strip IFM/K2-Horizon tool call tags (but NOT think tags — extract_thinking handles those)
+    for tag in _IFM_TAGS_TO_STRIP_THINK:
         text = text.replace(tag, "")
     return text.strip()
 
@@ -150,7 +157,7 @@ def remove_special_tokens_preserve_whitespace(text: str) -> str:
     if not text:
         return text
     text = SPECIAL_TOKENS_PATTERN.sub("", text)
-    for tag in _IFM_TAGS_TO_STRIP:
+    for tag in _IFM_TAGS_TO_STRIP_THINK:
         text = text.replace(tag, "")
     return text
 
@@ -1049,6 +1056,8 @@ def extract_text_content(
             msg_dict = {"role": role, "content": content if content else ""}
             if reasoning_out is not None:
                 msg_dict["reasoning_content"] = reasoning_out
+            elif native_reasoning_content:
+                msg_dict["reasoning_content"] = ""
             if getattr(msg, "name", None):
                 msg_dict["name"] = msg.name
             if getattr(msg, "partial", False):
@@ -1120,6 +1129,8 @@ def extract_text_content(
             _extra["partial"] = True
         if reasoning_out is not None:
             _extra["reasoning_content"] = reasoning_out
+        elif native_reasoning_content and role == "assistant":
+            _extra["reasoning_content"] = ""
 
         # Handle None content
         if content is None:
@@ -1223,6 +1234,8 @@ def extract_multimodal_content(
             msg_dict = {"role": role, "content": content if content else ""}
             if reasoning_out is not None:
                 msg_dict["reasoning_content"] = reasoning_out
+            elif native_reasoning_content:
+                msg_dict["reasoning_content"] = ""
             if getattr(msg, "name", None):
                 msg_dict["name"] = msg.name
             if getattr(msg, "partial", False):
@@ -1289,6 +1302,8 @@ def extract_multimodal_content(
             _extra["partial"] = True
         if reasoning_out is not None:
             _extra["reasoning_content"] = reasoning_out
+        elif native_reasoning_content and role == "assistant":
+            _extra["reasoning_content"] = ""
 
         if content is None:
             processed_messages.append({"role": role, "content": "", **_extra})
