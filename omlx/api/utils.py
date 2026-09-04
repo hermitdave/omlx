@@ -22,6 +22,8 @@ _NATIVE_REASONING_MODEL_TYPES = {
     # Muse Glimmer's chat template renders history reasoning_content into
     # <|start|>assistant to=self<|message|> blocks.
     "muse_glimmer",
+    # K2-Horizon uses reasoning_content field for chain-of-thought.
+    "k2_horizon",
 }
 
 
@@ -91,12 +93,35 @@ def detect_and_strip_partial(messages: list[dict]) -> bool:
 
 # Pattern to match special tokens that should be removed from output
 SPECIAL_TOKENS_PATTERN = re.compile(
-    r"<\|im_end\|>|<\|im_start\|>|<\|endoftext\|>|"
-    r"<\|end\|>|<\|eot_id\|>|<\|start_header_id\|>|<\|end_header_id\|>|"
-    r"<\|image\|>|<\|audio\|>|"  # Gemma 4 VLM special tokens
-    r"\[e~\[|\]~b\]|\]~!b\[|\]!p~\[|\]!d~\[|"  # MiniMax M3 special tokens
+    r"\<\|im_end\|>|<\|im_start\|>|<\|endoftext\|>|"
+    r"\<\|end\|>|<\|eot_id\|>|<\|start_header_id\|>|<\|end_header_id\|>|"
+    r"\<\|image\|>|<\|audio\|>|"  # Gemma 4 VLM special tokens
+    r"\[e~\[|\]~b\]|\]!b\[|\]!p~\[|\]!d~\[|"  # MiniMax M3 special tokens
     r"</s>|<s>|<pad>|\[PAD\]|\[SEP\]|\[CLS\]|"
     r"<eos>|<bos>|<end_of_turn>|<start_of_turn>"  # Gemma special tokens (fixes #1087)
+)
+
+# IFM/K2-Horizon tags to strip (handled via str.replace for reliability)
+# Note: message delimiters use <|ifm|...> but thinking/tool tags use <ifm|...>
+_IFM_TAGS_TO_STRIP = (
+    "<|ifm|im_start|>",
+    "<|ifm|im_end|>",
+    "<ifm|think>",
+    "</ifm|think>",
+    "<ifm|think_fast>",
+    "</ifm|think_fast>",
+    "<ifm|think_faster>",
+    "</ifm|think_faster>",
+    "<ifm|tool_calls>",
+    "</ifm|tool_calls>",
+    "<ifm|tool_call>",
+    "</ifm|tool_call>",
+    "<ifm|arg_key>",
+    "</ifm|arg_key>",
+    "<ifm|arg_value>",
+    "</ifm|arg_value>",
+    "<ifm|arg_type>",
+    "</ifm|arg_type>",
 )
 
 
@@ -113,14 +138,21 @@ def clean_special_tokens(text: str) -> str:
     """
     if not text:
         return text
-    return SPECIAL_TOKENS_PATTERN.sub("", text).strip()
+    text = SPECIAL_TOKENS_PATTERN.sub("", text)
+    # Strip IFM/K2-Horizon tags
+    for tag in _IFM_TAGS_TO_STRIP:
+        text = text.replace(tag, "")
+    return text.strip()
 
 
 def remove_special_tokens_preserve_whitespace(text: str) -> str:
     """Remove special tokens without trimming surrounding whitespace."""
     if not text:
         return text
-    return SPECIAL_TOKENS_PATTERN.sub("", text)
+    text = SPECIAL_TOKENS_PATTERN.sub("", text)
+    for tag in _IFM_TAGS_TO_STRIP:
+        text = text.replace(tag, "")
+    return text
 
 
 def clean_output_text(text: str) -> str:

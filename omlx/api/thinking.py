@@ -22,12 +22,26 @@ _MINIMAX_OPEN_TAG = "<mm:think>"
 _MINIMAX_CLOSE_TAG = "</mm:think>"
 _HY3_OPEN_TAG = "<think:opensource>"
 _HY3_CLOSE_TAG = "</think:opensource>"
+# IFM / K2-Horizon think tags (from IFM chat template)
+_IFM_OPEN_TAGS = (
+    "<ifm|think>",
+    "<ifm|think_fast>",
+    "<ifm|think_faster>",
+)
+_IFM_CLOSE_TAGS = (
+    "</ifm|think>",
+    "</ifm|think_fast>",
+    "</ifm|think_faster>",
+)
 
 # Regex for non-streaming extraction (complete text)
 _THINKING_PATTERN = re.compile(r'<think>(.*?)</think>', re.DOTALL)
 # Handle case where <think> is missing but </think> is present
-# (scheduler prepends <think>\n but the tag may be split)
 _THINKING_TAIL_PATTERN = re.compile(r'^(.*?)</think>', re.DOTALL)
+# IFM / K2-Horizon think tags
+_IFM_THINK_PATTERN = re.compile(
+    r'<\|ifm\|think(?:_fast|_faster)?>(.*?)</ifm\|think(?:_fast|_faster)?>', re.DOTALL
+)
 
 
 def _safe_tokenizer_attr(tokenizer, attr: str, default=None):
@@ -177,6 +191,10 @@ def extract_thinking(text: str) -> Tuple[str, str]:
         .replace(_HY3_OPEN_TAG, _OPEN_TAG)
         .replace(_HY3_CLOSE_TAG, _CLOSE_TAG)
     )
+
+    # Normalize IFM/K2-Horizon tags to standard <think> format
+    for open_tag, close_tag in zip(_IFM_OPEN_TAGS, _IFM_CLOSE_TAGS):
+        text = text.replace(open_tag, _OPEN_TAG).replace(close_tag, _CLOSE_TAG)
 
     thinking_parts = []
     remaining = text
